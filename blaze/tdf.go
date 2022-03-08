@@ -188,6 +188,12 @@ func NewStruct2(label string, values *list.List) StructTdf {
 		Start2:  true,
 	}
 }
+func NewStructStub(values *list.List, start2 bool) StructTdf {
+	return StructTdf{
+		Values: values,
+		Start2: start2,
+	}
+}
 
 func (t StructTdf) Write(buf *PacketBuff) {
 	if t.Start2 {
@@ -457,7 +463,7 @@ func WriteTdf[T Tdf](buf *PacketBuff, value T) {
 	value.Write(buf)
 }
 
-func ReadTdf(b *PacketBuff) Tdf {
+func (b *PacketBuff) ReadTdf() Tdf {
 	head := b.UInt32()
 	tag := head & 0xFFFFFF00
 	t := TdfType(head & 0xFF)
@@ -532,7 +538,7 @@ func (b *PacketBuff) ReadStructValues() (*list.List, bool) {
 		} else {
 			start2 = true
 		}
-		out.PushBack(ReadTdf(b))
+		out.PushBack(b.ReadTdf())
 	}
 	return out, start2
 }
@@ -639,7 +645,7 @@ func (b *PacketBuff) ReadUnionTdf(head TdfImpl) UnionTdf {
 		TdfImpl: head,
 	}
 	if ty != EmptyType {
-		out.Content = ReadTdf(b)
+		out.Content = b.ReadTdf()
 	}
 	return out
 }

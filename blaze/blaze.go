@@ -225,3 +225,12 @@ func (b *PacketBuff) EncodePacketRaw(packet Packet) []byte {
 	_, _ = buf.Write(packet.Content)
 	return buf.Bytes()
 }
+
+func (packet *Packet) ReadContent() *list.List {
+	buff := PacketBuff{Buffer: bytes.NewBuffer(packet.Content)}
+	out := list.New()
+	for buff.Len() > 0 {
+		out.PushBack(buff.ReadTdf())
+	}
+	return out
+}
