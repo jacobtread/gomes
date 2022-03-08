@@ -6,8 +6,10 @@ import (
 	. "github.com/jacobtread/gomes/types"
 )
 
+type TdfType byte
+
 const (
-	IntType = iota
+	IntType TdfType = iota
 	StringType
 	BlobType
 	StructType
@@ -18,23 +20,27 @@ const (
 	PairType
 	TripleType
 	FloatType
+
+	EmptyType TdfType = 0x7F
 )
 
 type Tdf interface {
 	GetType() byte
 	GetTag() uint32
 	GetLabel() string
+
+	Write(buf *PacketBuff)
 }
 
 type TdfImpl struct {
 	Label string
 	Tag   uint32
-	Type  byte
+	Type  TdfType
 
 	Tdf
 }
 
-func (t TdfImpl) GetType() byte {
+func (t TdfImpl) GetType() TdfType {
 	return t.Type
 }
 func (t TdfImpl) GetTag() uint32 {
@@ -45,7 +51,7 @@ func (t TdfImpl) GetLabel() string {
 	return t.Label
 }
 
-func NewTdf(label string, t byte) TdfImpl {
+func NewTdf(label string, t TdfType) TdfImpl {
 	return TdfImpl{
 		Label: label,
 		Type:  t,
@@ -121,6 +127,10 @@ func NewInt64(label string, value int64) Int64Tdf {
 	}
 }
 
+func (t Int64Tdf) Write(buf *PacketBuff) {
+	buf.WriteVarInt(t.Value)
+}
+
 type StringTdf struct {
 	Value string
 	TdfImpl
@@ -133,6 +143,10 @@ func NewString(label string, value string) StringTdf {
 	}
 }
 
+func (t StringTdf) Write(buf *PacketBuff) {
+	buf.WriteString(t.Value)
+}
+
 type BlobTdf struct {
 	Data []byte
 	TdfImpl
@@ -143,6 +157,12 @@ func NewBlob(label string, data []byte) BlobTdf {
 		Data:    data,
 		TdfImpl: NewTdf(label, BlobType),
 	}
+}
+
+func (t BlobTdf) Write(buf *PacketBuff) {
+	data := t.Data
+	buf.WriteVarInt(int64(len(data)))
+	_, _ = buf.Write(data)
 }
 
 type StructTdf struct {
@@ -166,6 +186,17 @@ func NewStruct2(label string, values list.List) StructTdf {
 		TdfImpl: NewTdf(label, StructType),
 		Start2:  true,
 	}
+}
+
+func (s StructTdf) Write(buf *PacketBuff) {
+	if s.Start2 {
+		_ = buf.WriteByte(2)
+	}
+	values := s.Values
+	for l := values.Front(); l != nil; l = l.Next() {
+		WriteTdf(buf, l.Value)
+	}
+	_ = buf.WriteByte(0)
 }
 
 type SubType = byte
@@ -192,6 +223,23 @@ func NewList(label string, subtype SubType, count int32, list list.List) ListTdf
 		Count:   count,
 		List:    list,
 		TdfImpl: NewTdf(label, ListType),
+	}
+}
+
+func (l ListTdf) Write(buf *PacketBuff) {
+	_ = buf.WriteByte(l.SubType)
+	buf.WriteVarInt(int64(l.Count))
+	for el := l.List.Front(); el != nil; el = el.Next() {
+		switch l.SubType {
+		case IntList:
+			buf.WriteVarInt(el.Value.(int64))
+		case StringList:
+			buf.WriteString(el.Value.(string))
+		case StructList:
+			el.Value.(StructTdf).Write(buf)
+		case TripleList:
+			el.Value.(TripleTdf).Write(buf)
+		}
 	}
 }
 
@@ -259,6 +307,45 @@ func (l PairListTdf) Write(buf *PacketBuff) {
 	}
 }
 
+type UnionTdf struct {
+	Type    TdfType
+	Content Tdf
+	TdfImpl
+}
+
+func NewUnion(label string, uType TdfType, value Tdf) UnionTdf {
+	return UnionTdf{
+		Type:    uType,
+		Content: value,
+		TdfImpl: NewTdf(label, UnionType),
+	}
+}
+
+func (t UnionTdf) Write(buf *PacketBuff) {
+	buf.WriteByte(byte(t.Type))
+	if t.Type != EmptyType {
+		WriteTdf(buf, t.Content)
+	}
+}
+
+type IntListTdf struct {
+	Count int32
+	List  list.List // List of int64
+	TdfImpl
+}
+
+func NewIntList(label string, count int32, list list.List) IntListTdf {
+	return IntListTdf{
+		Count:   count,
+		List:    list,
+		TdfImpl: NewTdf(label, IntListType),
+	}
+}
+
+func (t IntListTdf) Write(buf *PacketBuff) {
+	
+}
+
 type PairTdf struct {
 	Pair
 	TdfImpl
@@ -306,51 +393,8 @@ func NewFloat(label string, value float64) FloatTdf {
 	}
 }
 
-func (s StructTdf) Write(buf *PacketBuff) {
-	if s.Start2 {
-		_ = buf.WriteByte(2)
-	}
-	values := s.Values
-	for l := values.Front(); l != nil; l = l.Next() {
-		WriteTdf(buf, l.Value)
-	}
-	_ = buf.WriteByte(0)
-}
-
-func (l ListTdf) Write(buf *PacketBuff) {
-	_ = buf.WriteByte(l.SubType)
-	buf.WriteVarInt(int64(l.Count))
-	for el := l.List.Front(); el != nil; el = el.Next() {
-		switch l.SubType {
-		case IntList:
-			buf.WriteVarInt(el.Value.(int64))
-		case StringList:
-			buf.WriteString(el.Value.(string))
-		case StructList:
-			el.Value.(StructTdf).Write(buf)
-		case TripleList:
-			el.Value.(TripleTdf).Write(buf)
-		}
-	}
-}
-
 func WriteTdf[T Tdf](buf *PacketBuff, value T) {
 	_ = binary.Write(buf, binary.BigEndian, value.GetTag())
 	_ = buf.WriteByte(value.GetType())
-	switch value.(type) {
-	case Int64Tdf:
-		buf.WriteVarInt(value.(Int64Tdf).Value)
-	case StringTdf:
-		buf.WriteString(value.(StringTdf).Value)
-	case BlobTdf:
-		data := value.(BlobTdf).Data
-		buf.WriteVarInt(int64(len(data)))
-		_, _ = buf.Write(data)
-	case StructTdf:
-		value.(StructTdf).Write(buf)
-	case ListTdf:
-		value.(ListTdf).Write(buf)
-	case PairListTdf:
-		value.(PairListTdf).Write(buf)
-	}
+	value.Write(buf)
 }
