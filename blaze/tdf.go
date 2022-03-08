@@ -457,8 +457,8 @@ func WriteTdf[T Tdf](buf *PacketBuff, value T) {
 	value.Write(buf)
 }
 
-func ReadTdf(buf *PacketBuff) Tdf {
-	head := buf.UInt32()
+func ReadTdf(b *PacketBuff) Tdf {
+	head := b.UInt32()
 	tag := head & 0xFFFFFF00
 	t := TdfType(head & 0xFF)
 	impl := TdfImpl{
@@ -468,77 +468,77 @@ func ReadTdf(buf *PacketBuff) Tdf {
 	}
 	switch t {
 	case IntType:
-		return ReadIntTdf(impl, buf)
+		return b.ReadIntTdf(impl)
 	case StringType:
-		return ReadStringTdf(impl, buf)
+		return b.ReadStringTdf(impl)
 	case BlobType:
-		return ReadBlobTdf(impl, buf)
+		return b.ReadBlobTdf(impl)
 	case StructType:
-		return ReadStructTdf(impl, buf)
+		return b.ReadStructTdf(impl)
 	case ListType:
-		return ReadListTdf(impl, buf)
+		return b.ReadListTdf(impl)
 	case PairListType:
-		return ReadPairListTdf(impl, buf)
+		return b.ReadPairListTdf(impl)
 	case UnionType:
-		return ReadUnionTdf(impl, buf)
+		return b.ReadUnionTdf(impl)
 	case VarIntListType:
-		return ReadVarIntListTdf(impl, buf)
+		return b.ReadVarIntListTdf(impl)
 	case PairType:
-		return ReadPairTdf(impl, buf)
+		return b.ReadPairTdf(impl)
 	case TripleType:
-		return ReadTripleTdf(impl, buf)
+		return b.ReadTripleTdf(impl)
 	case FloatType:
-		return ReadFloatTdf(impl, buf)
+		return b.ReadFloatTdf(impl)
 	default:
 		log.Printf("Dont know how to handle tdf with type '%d'", t)
 		return nil
 	}
 }
 
-func ReadIntTdf(head TdfImpl, buf *PacketBuff) Int64Tdf {
+func (b *PacketBuff) ReadIntTdf(head TdfImpl) Int64Tdf {
 	return Int64Tdf{
-		Value:   int64(buf.ReadVarInt()),
+		Value:   int64(b.ReadVarInt()),
 		TdfImpl: head,
 	}
 }
 
-func ReadStringTdf(head TdfImpl, buf *PacketBuff) StringTdf {
+func (b *PacketBuff) ReadStringTdf(head TdfImpl) StringTdf {
 	return StringTdf{
-		Value:   buf.ReadString(),
+		Value:   b.ReadString(),
 		TdfImpl: head,
 	}
 }
 
-func ReadBlobTdf(head TdfImpl, buf *PacketBuff) BlobTdf {
-	size := buf.ReadVarInt()
+func (b *PacketBuff) ReadBlobTdf(head TdfImpl) BlobTdf {
+	size := b.ReadVarInt()
 	data := make([]byte, size)
-	_, _ = io.ReadFull(buf, data)
+	_, _ = io.ReadFull(b, data)
 	return BlobTdf{
 		Data:    data,
 		TdfImpl: head,
 	}
 }
 
-func ReadStructValues(buf *PacketBuff) (*list.List, bool) {
+func (b *PacketBuff) ReadStructValues() (*list.List, bool) {
 	out := list.New()
 	start2 := false
 	for {
-		b, err := buf.ReadByte()
+		by, err := b.ReadByte()
 		if err != nil {
 			break
 		}
-		if b != 2 {
-			_ = buf.UnreadByte()
+		if by != 2 {
+			_ = b.UnreadByte()
 		} else {
 			start2 = true
 		}
-		out.PushBack(ReadTdf(buf))
+		out.PushBack(ReadTdf(b))
 	}
 	return out, start2
 }
 
-func ReadStructTdf(head TdfImpl, buf *PacketBuff) StructTdf {
-	values, start2 := ReadStructValues(buf)
+func (b *PacketBuff) ReadStructTdf(head TdfImpl) StructTdf {
+	values, start2 := b.ReadStructValues()
 	return StructTdf{
 		Values:  values,
 		Start2:  start2,
@@ -546,25 +546,25 @@ func ReadStructTdf(head TdfImpl, buf *PacketBuff) StructTdf {
 	}
 }
 
-func ReadListTdf(head TdfImpl, buf *PacketBuff) ListTdf {
-	subType, _ := buf.ReadByte()
-	count := buf.ReadVarInt()
+func (b *PacketBuff) ReadListTdf(head TdfImpl) ListTdf {
+	subType, _ := b.ReadByte()
+	count := b.ReadVarInt()
 	out := list.New()
 	var i uint64 = 0
 	for i < count {
 		switch subType {
 		case IntList:
-			out.PushBack(buf.ReadVarInt())
+			out.PushBack(b.ReadVarInt())
 		case StringList:
-			out.PushBack(buf.ReadString())
+			out.PushBack(b.ReadString())
 		case StructList:
-			values, start2 := ReadStructValues(buf)
+			values, start2 := b.ReadStructValues()
 			out.PushBack(StructTdf{
 				Values: values,
 				Start2: start2,
 			})
 		case TripleList:
-			out.PushBack(ReadTriple(buf))
+			out.PushBack(ReadTriple(b))
 		default:
 			log.Printf("Don't know how to handle list type '%d'", subType)
 		}
@@ -578,44 +578,44 @@ func ReadListTdf(head TdfImpl, buf *PacketBuff) ListTdf {
 	}
 }
 
-func ReadPairListTdf(head TdfImpl, buf *PacketBuff) PairListTdf {
-	subTypeA, _ := buf.ReadByte()
-	subTypeB, _ := buf.ReadByte()
-	count := buf.ReadVarInt()
+func (b *PacketBuff) ReadPairListTdf(head TdfImpl) PairListTdf {
+	subTypeA, _ := b.ReadByte()
+	subTypeB, _ := b.ReadByte()
+	count := b.ReadVarInt()
 	outA := list.New()
 	outB := list.New()
 	var i uint64 = 0
 	for i < count {
 		switch subTypeA {
 		case IntList:
-			outA.PushBack(buf.ReadVarInt())
+			outA.PushBack(b.ReadVarInt())
 		case StringList:
-			outA.PushBack(buf.ReadString())
+			outA.PushBack(b.ReadString())
 		case StructList:
-			values, start2 := ReadStructValues(buf)
+			values, start2 := b.ReadStructValues()
 			outA.PushBack(StructTdf{
 				Values: values,
 				Start2: start2,
 			})
 		case FloatList:
-			outA.PushBack(buf.Float64())
+			outA.PushBack(b.Float64())
 		default:
 			log.Printf("Don't know how to handle list type '%d'", subTypeA)
 		}
 
 		switch subTypeB {
 		case IntList:
-			outB.PushBack(buf.ReadVarInt())
+			outB.PushBack(b.ReadVarInt())
 		case StringList:
-			outB.PushBack(buf.ReadString())
+			outB.PushBack(b.ReadString())
 		case StructList:
-			values, start2 := ReadStructValues(buf)
+			values, start2 := b.ReadStructValues()
 			outB.PushBack(StructTdf{
 				Values: values,
 				Start2: start2,
 			})
 		case FloatList:
-			outB.PushBack(buf.Float64())
+			outB.PushBack(b.Float64())
 		default:
 			log.Printf("Don't know how to handle list type '%d'", subTypeB)
 		}
@@ -631,24 +631,24 @@ func ReadPairListTdf(head TdfImpl, buf *PacketBuff) PairListTdf {
 	}
 }
 
-func ReadUnionTdf(head TdfImpl, buf *PacketBuff) UnionTdf {
-	t, _ := buf.ReadByte()
+func (b *PacketBuff) ReadUnionTdf(head TdfImpl) UnionTdf {
+	t, _ := b.ReadByte()
 	ty := TdfType(t)
 	out := UnionTdf{
 		Type:    ty,
 		TdfImpl: head,
 	}
 	if ty != EmptyType {
-		out.Content = ReadTdf(buf)
+		out.Content = ReadTdf(b)
 	}
 	return out
 }
 
-func ReadVarIntListTdf(head TdfImpl, buf *PacketBuff) VarIntListTdf {
-	count := int32(buf.ReadVarInt())
+func (b *PacketBuff) ReadVarIntListTdf(head TdfImpl) VarIntListTdf {
+	count := int32(b.ReadVarInt())
 	out := list.New()
 	for i := int32(0); i < count; i++ {
-		out.PushBack(buf.ReadVarInt())
+		out.PushBack(b.ReadVarInt())
 	}
 	return VarIntListTdf{
 		Count:   count,
@@ -657,22 +657,22 @@ func ReadVarIntListTdf(head TdfImpl, buf *PacketBuff) VarIntListTdf {
 	}
 }
 
-func ReadPairTdf(head TdfImpl, buf *PacketBuff) PairTdf {
+func (b *PacketBuff) ReadPairTdf(head TdfImpl) PairTdf {
 	return PairTdf{
-		Pair:    ReadPair(buf),
+		Pair:    ReadPair(b),
 		TdfImpl: head,
 	}
 }
 
-func ReadTripleTdf(head TdfImpl, buf *PacketBuff) TripleTdf {
+func (b *PacketBuff) ReadTripleTdf(head TdfImpl) TripleTdf {
 	return TripleTdf{
-		Triple:  ReadTriple(buf),
+		Triple:  ReadTriple(b),
 		TdfImpl: head,
 	}
 }
 
-func ReadFloatTdf(head TdfImpl, buf *PacketBuff) FloatTdf {
-	f := buf.Float64()
+func (b *PacketBuff) ReadFloatTdf(head TdfImpl) FloatTdf {
+	f := b.Float64()
 	return FloatTdf{
 		Value:   f,
 		TdfImpl: head,
