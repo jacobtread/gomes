@@ -2,9 +2,9 @@ package server
 
 import (
 	"bytes"
-	"crypto/tls"
 	"fmt"
 	"github.com/jacobtread/gomes/blaze"
+	"io/ioutil"
 	"log"
 	"net"
 )
@@ -12,16 +12,8 @@ import (
 func StartRedirector() {
 	log.Println("GoMES Redirector Starting")
 
-	x509KeyPair, err := tls.X509KeyPair(CertFile, KeyFile)
-	if err != nil {
-		log.Fatalln("Failed to acquire x509KeyPair", err)
-		return
-	}
-
-	config := &tls.Config{Certificates: []tls.Certificate{x509KeyPair}}
-
 	// Listen using tcp on all addresses with the game port
-	t, err := tls.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", RedirectorPort), config)
+	t, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", RedirectorPort))
 	if err != nil {
 		panic(err)
 		return
@@ -37,20 +29,25 @@ func StartRedirector() {
 			log.Println("Failed to accept redirector connection", err)
 			continue
 		}
-		conn := blaze.Connection{Conn: c}
-		log.Println("Accepted connection", conn)
-		go handleConnectionRedirector(&conn)
+		log.Println("Accepted redirect connection")
+		go handleConnectionRedirect(c)
 	}
 }
 
-func handleConnectionRedirector(conn *blaze.Connection) {
-	buf := blaze.PacketBuff{Buffer: &bytes.Buffer{}}
-	conn.PacketBuff = buf
-
+func handleConnectionRedirect(conn net.Conn) {
+	buf := blaze.PacketBuff{}
+	bc := blaze.Connection{Conn: conn, PacketBuff: &buf}
 	for {
-		_, _ = buf.ReadFrom(conn)
-		packet := buf.ReadAllPackets().Front().Value.(blaze.Packet)
-		println(packet)
+		b, err := ioutil.ReadAll(conn)
+		if err != nil {
+			panic(err)
+		}
+		bc.Buffer = bytes.NewBuffer(b)
+		if buf.Len() > 0 {
+			packet := buf.ReadPacket()
+			fmt.Println(packet.ToDescriptor())
 
+			return
+		}
 	}
 }

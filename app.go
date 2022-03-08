@@ -8,4 +8,7 @@ import (
 func main() {
 	go server.StartMain()
 	go server.StartRedirector()
+	for true {
+
+	}
 }

@@ -21,7 +21,7 @@ func StartMain() {
 	config := &tls.Config{Certificates: []tls.Certificate{x509KeyPair}}
 
 	// Listen using tcp on all addresses with the game port
-	t, err := tls.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", RedirectorPort), config)
+	t, err := tls.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", GamePort), config)
 	if err != nil {
 		panic(err)
 		return
@@ -34,23 +34,22 @@ func StartMain() {
 	for {
 		c, err := t.Accept()
 		if err != nil {
-			log.Println("Failed to accept redirector connection", err)
+			log.Println("Failed to accept main connection", err)
 			continue
 		}
-		conn := blaze.Connection{Conn: c}
-		log.Println("Accepted connection", conn)
-		go handleConnectionMain(&conn)
+		log.Println("Accepted redirect connection", c)
+		go handleConnectionMain(c)
 	}
 }
 
-func handleConnectionMain(conn *blaze.Connection) {
+func handleConnectionMain(conn net.Conn) {
 	buf := blaze.PacketBuff{Buffer: &bytes.Buffer{}}
-	conn.PacketBuff = buf
+	bc := blaze.Connection{Conn: conn, PacketBuff: &buf}
 
 	for {
-		_, _ = buf.ReadFrom(conn)
+		_, _ = buf.ReadFrom(bc.Conn)
 		packet := buf.ReadAllPackets().Front().Value.(blaze.Packet)
-		println(packet)
+		fmt.Println(packet.ToDescriptor())
 
 	}
 }

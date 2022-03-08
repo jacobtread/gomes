@@ -273,8 +273,12 @@ var NotificationNames = map[uint32]string{
 }
 
 type Connection struct {
-	PacketBuff
+	*PacketBuff
 	net.Conn
+}
+
+func NewConnection(conn net.Conn) {
+
 }
 
 type PacketBuff struct {
@@ -360,7 +364,7 @@ func (b *PacketBuff) WriteNum(value any) {
 // ReadString reads a string from the buffer
 func (b *PacketBuff) ReadString() string {
 	l := b.ReadVarInt()
-	buf := make([]byte, l)
+	buf := make([]byte, 0, l)
 	_, _ = io.ReadFull(b, buf)
 	_, _ = b.ReadByte() // Strings end with a zero byte
 	return string(buf)
@@ -389,16 +393,17 @@ func (b *PacketBuff) ReadPacket() *Packet {
 		QType:     b.UInt16(),
 		Id:        b.UInt16(),
 	}
-	if (packet.QType * 0x10) != 0 {
+	if (packet.QType & 0x10) != 0 {
 		packet.ExtLength = b.UInt16()
 	} else {
 		packet.ExtLength = 0
 	}
 	// Calculate the total size with the extension length
 	l := int32(packet.Length) + (int32(packet.ExtLength) << 16)
-	by := make([]byte, l)        // Create an empty byte array for the content
+	by := make([]byte, 0, l)     // Create an empty byte array for the content
 	_, err := io.ReadFull(b, by) // Read all the content bytes
 	if err != nil {
+		panic(err)
 		return nil
 	}
 	packet.Content = by
@@ -417,14 +422,14 @@ func (b *PacketBuff) ReadPacketHeading() *Packet {
 		QType:     b.UInt16(),
 		Id:        b.UInt16(),
 	}
-	if (packet.QType * 0x10) != 0 {
+	if (packet.QType & 0x10) != 0 {
 		packet.ExtLength = b.UInt16()
 	} else {
 		packet.ExtLength = 0
 	}
 	// Calculate the total size with the extension length
 	l := int32(packet.Length) + (int32(packet.ExtLength) << 16)
-	by := make([]byte, l) // Create an empty byte array in place of the content
+	by := make([]byte, 0, l) // Create an empty byte array for the content
 	packet.Content = by
 	return &packet
 }
@@ -499,7 +504,7 @@ func (p *Packet) ReadContent() *list.List {
 }
 
 func (p *Packet) ToDescriptor() string {
-	compString := fmt.Sprintf("0x%04d", p.Component)
+	compString := fmt.Sprintf("0x%0d", p.Component)
 	cmdString := fmt.Sprintf("0x%04d", p.Command)
 	compName, exists := ComponentNames[p.Component]
 	if exists {
