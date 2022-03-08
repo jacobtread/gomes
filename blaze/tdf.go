@@ -347,11 +347,11 @@ func (t UnionTdf) GetHead() TdfImpl {
 
 type VarIntListTdf struct {
 	Count int32
-	List  list.List // List of int64
+	List  *list.List // List of int64
 	TdfImpl
 }
 
-func NewVarIntList(label string, count int32, list list.List) VarIntListTdf {
+func NewVarIntList(label string, count int32, list *list.List) VarIntListTdf {
 	return VarIntListTdf{
 		Count:   count,
 		List:    list,
@@ -481,6 +481,7 @@ func ReadTdf(buf *PacketBuff) Tdf {
 		return ReadPairListTdf(impl, buf)
 	case UnionType:
 	case VarIntListType:
+		return ReadVarIntList(impl, buf)
 	case PairType:
 	case TripleType:
 	case FloatType:
@@ -624,5 +625,18 @@ func ReadPairListTdf(head TdfImpl, buf *PacketBuff) PairListTdf {
 		ListB:    outB,
 		Count:    int32(count),
 		TdfImpl:  head,
+	}
+}
+
+func ReadVarIntList(head TdfImpl, buf *PacketBuff) VarIntListTdf {
+	count := int32(buf.ReadVarInt())
+	out := list.New()
+	for i := int32(0); i < count; i++ {
+		out.PushBack(buf.ReadVarInt())
+	}
+	return VarIntListTdf{
+		Count:   count,
+		List:    out,
+		TdfImpl: head,
 	}
 }
