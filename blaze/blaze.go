@@ -182,7 +182,7 @@ func (b *PacketBuff) EncodePacket(comp uint16, cmd uint16, err uint16, qType uin
 	_ = binary.Write(buf, binary.BigEndian, qType)
 	_ = binary.Write(buf, binary.BigEndian, id)
 	for l := content.Front(); l != nil; l = l.Next() {
-		WriteTdf(buf, l)
+		WriteTdf(buf, l.Value)
 	}
 	return buf.Bytes()
 }
