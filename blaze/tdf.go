@@ -167,13 +167,13 @@ func (t BlobTdf) Write(buf *PacketBuff) {
 }
 
 type StructTdf struct {
-	Values list.List // List of TdfImpl values
+	Values *list.List // List of TdfImpl values
 	Start2 bool
 
 	TdfImpl
 }
 
-func NewStruct(label string, values list.List) StructTdf {
+func NewStruct(label string, values *list.List) StructTdf {
 	return StructTdf{
 		Values:  values,
 		TdfImpl: NewTdf(label, StructType),
@@ -181,7 +181,7 @@ func NewStruct(label string, values list.List) StructTdf {
 	}
 }
 
-func NewStruct2(label string, values list.List) StructTdf {
+func NewStruct2(label string, values *list.List) StructTdf {
 	return StructTdf{
 		Values:  values,
 		TdfImpl: NewTdf(label, StructType),
@@ -459,6 +459,7 @@ func ReadTdf(buf *PacketBuff) Tdf {
 	case BlobType:
 		return ReadBlobTdf(impl, buf)
 	case StructType:
+		return ReadStructTdf(impl, buf)
 	case ListType:
 	case PairListType:
 	case UnionType:
@@ -513,4 +514,13 @@ func ReadStructValues(buf *PacketBuff) (*list.List, bool) {
 		out.PushBack(ReadTdf(buf))
 	}
 	return out, start2
+}
+
+func ReadStructTdf(head TdfImpl, buf *PacketBuff) StructTdf {
+	values, start2 := ReadStructValues(buf)
+	return StructTdf{
+		Values:  values,
+		Start2:  start2,
+		TdfImpl: head,
+	}
 }
