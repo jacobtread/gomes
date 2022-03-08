@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"crypto/tls"
 	_ "embed"
 	"fmt"
@@ -54,12 +54,12 @@ func main() {
 }
 
 func HandleConnection(conn *blaze.Connection) {
-	reader := bufio.NewReader(conn) // Create a new reader
-	writer := bufio.NewWriter(conn) // Create a new writer
-	buf := blaze.PacketBuff{Reader: reader, Writer: writer}
+	buf := blaze.PacketBuff{Buffer: &bytes.Buffer{}}
 	conn.PacketBuff = buf
 
 	for {
+		_, _ = buf.ReadFrom(conn)
+
 		p := buf.ReadPacket()
 		log.Println(p)
 	}

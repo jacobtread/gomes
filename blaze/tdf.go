@@ -194,7 +194,7 @@ func (s StructTdf) Write(buf *PacketBuff) {
 	}
 	values := s.Values
 	for l := values.Front(); l != nil; l = l.Next() {
-		WriteTdf(buf, l.Value)
+		WriteTdf(buf, l.Value.(Tdf))
 	}
 	_ = buf.WriteByte(0)
 }
