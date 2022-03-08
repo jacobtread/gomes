@@ -13,7 +13,8 @@ type Connection struct {
 }
 
 type PacketBuff struct {
-	*bufio.ReadWriter
+	*bufio.Writer
+	*bufio.Reader
 }
 
 type Packet struct {
@@ -29,46 +30,72 @@ type Packet struct {
 
 // UInt16 reads an uint16 from the provided packet buffer using the
 // big endian byte order
-func (r *PacketBuff) UInt16() uint16 {
+func (b *PacketBuff) UInt16() uint16 {
 	var out uint16
-	_ = binary.Read(r, binary.BigEndian, &out)
+	_ = binary.Read(b, binary.BigEndian, &out)
 	return out
 }
 
 // UInt32 reads an uint32 from the provided packet buffer using the
 // big endian byte order
-func (r *PacketBuff) UInt32() uint32 {
+func (b *PacketBuff) UInt32() uint32 {
 	var out uint32
-	_ = binary.Read(r, binary.BigEndian, &out)
+	_ = binary.Read(b, binary.BigEndian, &out)
 	return out
 }
 
 // Float64 reads a float64 from the provided packet buffer using the
 // big endian byte order
-func (r *PacketBuff) Float64() float64 {
+func (b *PacketBuff) Float64() float64 {
 	var out float64
-	_ = binary.Read(r, binary.BigEndian, &out)
+	_ = binary.Read(b, binary.BigEndian, &out)
 	return out
 }
 
+// WriteVarInt writes a var int to the packet buffer
+func (b *PacketBuff) WriteVarInt(value int64) {
+	ux := uint64(value) << 1
+	if value < 0 {
+		ux = ^ux
+	}
+	i := 0
+	for ux >= 0x80 {
+		_ = b.WriteByte(byte(ux) | 0x80)
+		ux >>= 7
+		i++
+	}
+	_ = b.WriteByte(byte(ux))
+}
+
+// ReadVarInt reads a var int from the packet buffer
+func (b *PacketBuff) ReadVarInt() uint64 {
+	out, _ := binary.ReadUvarint(b)
+	return out
+}
+
+// WriteNum takes any number type and writes it to the packet
+func (b *PacketBuff) WriteNum(value any) {
+	_ = binary.Write(b.Writer, binary.BigEndian, value)
+}
+
 // ReadPacket reads a game packet from the provided packet reader
-func (r *PacketBuff) ReadPacket() *Packet {
+func (b *PacketBuff) ReadPacket() *Packet {
 	packet := Packet{
-		Length:    r.UInt16(),
-		Component: r.UInt16(),
-		Command:   r.UInt16(),
-		Error:     r.UInt16(),
-		QType:     r.UInt16(),
+		Length:    b.UInt16(),
+		Component: b.UInt16(),
+		Command:   b.UInt16(),
+		Error:     b.UInt16(),
+		QType:     b.UInt16(),
 	}
 	if (packet.QType * 0x10) != 0 {
-		packet.ExtLength = r.UInt16()
+		packet.ExtLength = b.UInt16()
 	} else {
 		packet.ExtLength = 0
 	}
 	// Calculate the total size with the extension length
 	l := int32(packet.Length) + (int32(packet.ExtLength) << 16)
 	bytes := make([]byte, l)        // Create an empty byte array for the content
-	_, err := io.ReadFull(r, bytes) // Read all the content bytes
+	_, err := io.ReadFull(b, bytes) // Read all the content bytes
 	if err != nil {
 		return nil
 	}
@@ -79,16 +106,16 @@ func (r *PacketBuff) ReadPacket() *Packet {
 // ReadPacketHeading reads a game packet from the provided packet reader.
 // but only reads the heading portion of the packet skips over the packet
 // contents.
-func (r *PacketBuff) ReadPacketHeading() *Packet {
+func (b *PacketBuff) ReadPacketHeading() *Packet {
 	packet := Packet{
-		Length:    r.UInt16(),
-		Component: r.UInt16(),
-		Command:   r.UInt16(),
-		Error:     r.UInt16(),
-		QType:     r.UInt16(),
+		Length:    b.UInt16(),
+		Component: b.UInt16(),
+		Command:   b.UInt16(),
+		Error:     b.UInt16(),
+		QType:     b.UInt16(),
 	}
 	if (packet.QType * 0x10) != 0 {
-		packet.ExtLength = r.UInt16()
+		packet.ExtLength = b.UInt16()
 	} else {
 		packet.ExtLength = 0
 	}

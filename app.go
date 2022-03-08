@@ -17,6 +17,7 @@ var certFile []byte
 var keyFile []byte
 
 func main() {
+
 	log.Println("GoMES Starting")
 
 	const port = 14219 // The mass effect 3 game server port
@@ -55,8 +56,7 @@ func main() {
 func HandleConnection(conn *blaze.Connection) {
 	reader := bufio.NewReader(conn) // Create a new reader
 	writer := bufio.NewWriter(conn) // Create a new writer
-	buf := blaze.PacketBuff{ReadWriter: bufio.NewReadWriter(reader, writer)}
-
+	buf := blaze.PacketBuff{Reader: reader, Writer: writer}
 	conn.PacketBuff = buf
 
 	for {
