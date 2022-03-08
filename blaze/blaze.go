@@ -91,7 +91,7 @@ func (b *PacketBuff) ReadString() string {
 // WriteString writes a string to the buffer
 func (b *PacketBuff) WriteString(value string) {
 	var l int
-	if strings.HasSuffix(value, "\\0") {
+	if strings.HasSuffix(value, "\x00") {
 		l = len(value)
 	} else {
 		l = len(value) + 1
