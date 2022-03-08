@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -488,11 +489,33 @@ func (b *PacketBuff) EncodePacketRaw(packet Packet) []byte {
 	return buf.Bytes()
 }
 
-func (packet *Packet) ReadContent() *list.List {
-	buff := PacketBuff{Buffer: bytes.NewBuffer(packet.Content)}
+func (p *Packet) ReadContent() *list.List {
+	buff := PacketBuff{Buffer: bytes.NewBuffer(p.Content)}
 	out := list.New()
 	for buff.Len() > 0 {
 		out.PushBack(buff.ReadTdf())
 	}
 	return out
+}
+
+func (p *Packet) ToDescriptor() string {
+	compString := fmt.Sprintf("0x%04d", p.Component)
+	cmdString := fmt.Sprintf("0x%04d", p.Command)
+	compName, exists := ComponentNames[p.Component]
+	if exists {
+		compString = compName
+		cmdKey := (uint32(p.Component) << 16) + uint32(p.Command)
+		if p.QType == 0x2000 {
+			nName, exists := NotificationNames[cmdKey]
+			if exists {
+				cmdString = nName
+			}
+		} else {
+			cmdName, exists := CommandNames[cmdKey]
+			if exists {
+				cmdString = cmdName
+			}
+		}
+	}
+	return fmt.Sprintf("%s:%s", compString, cmdString)
 }
