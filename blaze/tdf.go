@@ -480,8 +480,9 @@ func ReadTdf(buf *PacketBuff) Tdf {
 	case PairListType:
 		return ReadPairListTdf(impl, buf)
 	case UnionType:
+		return ReadUnionTdf(impl, buf)
 	case VarIntListType:
-		return ReadVarIntList(impl, buf)
+		return ReadVarIntListTdf(impl, buf)
 	case PairType:
 	case TripleType:
 	case FloatType:
@@ -628,7 +629,19 @@ func ReadPairListTdf(head TdfImpl, buf *PacketBuff) PairListTdf {
 	}
 }
 
-func ReadVarIntList(head TdfImpl, buf *PacketBuff) VarIntListTdf {
+func ReadUnionTdf(head TdfImpl, buf *PacketBuff) UnionTdf {
+	t, _ := buf.ReadByte()
+	ty := TdfType(t)
+	out := UnionTdf{
+		Type: ty,
+	}
+	if ty != EmptyType {
+		out.Content = ReadTdf(buf)
+	}
+	return out
+}
+
+func ReadVarIntListTdf(head TdfImpl, buf *PacketBuff) VarIntListTdf {
 	count := int32(buf.ReadVarInt())
 	out := list.New()
 	for i := int32(0); i < count; i++ {
