@@ -5,10 +5,30 @@ import (
 	"encoding/binary"
 )
 
+const (
+	IntType = iota
+	StringType
+	BlobType
+	StructType
+	ListType
+	DoubleListType
+	UnionType
+	IntListType
+	DoubleType
+	TripleType
+	FloatType
+)
+
+type TdfWritable interface {
+	Write(buf *PacketBuff)
+}
+
 type Tdf struct {
 	Label string
 	Tag   uint32
 	Type  byte
+
+	TdfWritable
 }
 
 type Pair struct {
@@ -96,10 +116,14 @@ type Int64Tdf struct {
 	Tdf
 }
 
+func (t Int64Tdf) Write(buf *PacketBuff) {
+	buf.WriteVarInt(t.Value)
+}
+
 func NewIntTdf(label string, value int64) Int64Tdf {
 	return Int64Tdf{
 		Value: value,
-		Tdf:   NewTdf(label, 0),
+		Tdf:   NewTdf(label, IntType),
 	}
 }
 
@@ -109,10 +133,14 @@ type FloatTdf struct {
 	Tdf
 }
 
+func (t FloatTdf) Write(buf *PacketBuff) {
+
+}
+
 func NewFloatTdf(label string, value float64) FloatTdf {
 	return FloatTdf{
 		Value: value,
-		Tdf:   NewTdf(label, 0xA),
+		Tdf:   NewTdf(label, FloatType),
 	}
 }
 
@@ -125,7 +153,7 @@ type StringTdf struct {
 func NewStringTdf(label string, value string) StringTdf {
 	return StringTdf{
 		Value: value,
-		Tdf:   NewTdf(label, 1),
+		Tdf:   NewTdf(label, StringType),
 	}
 }
 
@@ -139,7 +167,7 @@ type StructTdf struct {
 func NewStructTdf(label string, values list.List) StructTdf {
 	return StructTdf{
 		Values: values,
-		Tdf:    NewTdf(label, 3),
+		Tdf:    NewTdf(label, StructType),
 		Start2: false,
 	}
 }
@@ -147,7 +175,13 @@ func NewStructTdf(label string, values list.List) StructTdf {
 func NewStructTdf2(label string, values list.List) StructTdf {
 	return StructTdf{
 		Values: values,
-		Tdf:    NewTdf(label, 3),
+		Tdf:    NewTdf(label, StructType),
 		Start2: true,
 	}
+}
+
+func WriteTdf[T Tdf](buf *PacketBuff, value T) {
+	_ = binary.Write(buf, binary.BigEndian, value.Tag)
+	_ = buf.WriteByte(value.Type)
+	value.Write(buf)
 }
