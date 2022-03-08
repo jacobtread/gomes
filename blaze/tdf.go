@@ -484,13 +484,15 @@ func ReadTdf(buf *PacketBuff) Tdf {
 	case VarIntListType:
 		return ReadVarIntListTdf(impl, buf)
 	case PairType:
+		return ReadPairTdf(impl, buf)
 	case TripleType:
+		return ReadTripleTdf(impl, buf)
 	case FloatType:
+		return ReadFloatTdf(impl, buf)
 	default:
 		log.Printf("Dont know how to handle tdf with type '%d'", t)
 		return nil
 	}
-	return nil
 }
 
 func ReadIntTdf(head TdfImpl, buf *PacketBuff) Int64Tdf {
@@ -633,7 +635,8 @@ func ReadUnionTdf(head TdfImpl, buf *PacketBuff) UnionTdf {
 	t, _ := buf.ReadByte()
 	ty := TdfType(t)
 	out := UnionTdf{
-		Type: ty,
+		Type:    ty,
+		TdfImpl: head,
 	}
 	if ty != EmptyType {
 		out.Content = ReadTdf(buf)
@@ -650,6 +653,28 @@ func ReadVarIntListTdf(head TdfImpl, buf *PacketBuff) VarIntListTdf {
 	return VarIntListTdf{
 		Count:   count,
 		List:    out,
+		TdfImpl: head,
+	}
+}
+
+func ReadPairTdf(head TdfImpl, buf *PacketBuff) PairTdf {
+	return PairTdf{
+		Pair:    ReadPair(buf),
+		TdfImpl: head,
+	}
+}
+
+func ReadTripleTdf(head TdfImpl, buf *PacketBuff) TripleTdf {
+	return TripleTdf{
+		Triple:  ReadTriple(buf),
+		TdfImpl: head,
+	}
+}
+
+func ReadFloatTdf(head TdfImpl, buf *PacketBuff) FloatTdf {
+	f := buf.Float64()
+	return FloatTdf{
+		Value:   f,
 		TdfImpl: head,
 	}
 }
