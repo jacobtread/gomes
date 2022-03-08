@@ -328,22 +328,27 @@ func (t UnionTdf) Write(buf *PacketBuff) {
 	}
 }
 
-type IntListTdf struct {
+type VarIntListTdf struct {
 	Count int32
 	List  list.List // List of int64
 	TdfImpl
 }
 
-func NewIntList(label string, count int32, list list.List) IntListTdf {
-	return IntListTdf{
+func NewVarIntList(label string, count int32, list list.List) VarIntListTdf {
+	return VarIntListTdf{
 		Count:   count,
 		List:    list,
 		TdfImpl: NewTdf(label, IntListType),
 	}
 }
 
-func (t IntListTdf) Write(buf *PacketBuff) {
-	
+func (t VarIntListTdf) Write(buf *PacketBuff) {
+	buf.WriteVarInt(int64(t.Count))
+	if t.Count > 0 {
+		for l := t.List.Front(); l != nil; l = l.Next() {
+			buf.WriteVarInt(l.Value.(int64))
+		}
+	}
 }
 
 type PairTdf struct {
@@ -391,6 +396,10 @@ func NewFloat(label string, value float64) FloatTdf {
 		Value:   value,
 		TdfImpl: NewTdf(label, FloatType),
 	}
+}
+
+func (t FloatTdf) Write(buf *PacketBuff) {
+	buf.WriteNum(t.Value)
 }
 
 func WriteTdf[T Tdf](buf *PacketBuff, value T) {
