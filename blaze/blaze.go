@@ -124,6 +124,7 @@ func (b *PacketBuff) ReadPacket() *Packet {
 		Command:   b.UInt16(),
 		Error:     b.UInt16(),
 		QType:     b.UInt16(),
+		Id:        b.UInt16(),
 	}
 	if (packet.QType * 0x10) != 0 {
 		packet.ExtLength = b.UInt16()
@@ -151,6 +152,7 @@ func (b *PacketBuff) ReadPacketHeading() *Packet {
 		Command:   b.UInt16(),
 		Error:     b.UInt16(),
 		QType:     b.UInt16(),
+		Id:        b.UInt16(),
 	}
 	if (packet.QType * 0x10) != 0 {
 		packet.ExtLength = b.UInt16()
@@ -173,16 +175,53 @@ func (b *PacketBuff) ReadAllPackets() *list.List {
 }
 
 func (b *PacketBuff) EncodePacket(comp uint16, cmd uint16, err uint16, qType uint16, id uint16, content list.List) []byte {
-	var buf = &PacketBuff{Buffer: &bytes.Buffer{}}
-	_ = buf.WriteByte(0)
+	buf := &PacketBuff{Buffer: &bytes.Buffer{}}
+	contentBuff := &PacketBuff{Buffer: &bytes.Buffer{}}
+	for l := content.Front(); l != nil; l = l.Next() {
+		WriteTdf(contentBuff, l.Value.(Tdf))
+	}
+	c := contentBuff.Bytes()
+	l := len(c)
+
+	_ = buf.WriteByte(byte((l & 0xFFFF) >> 8))
+	_ = buf.WriteByte(byte(l & 0xFF))
 	_ = buf.WriteByte(0)
 	_ = binary.Write(buf, binary.BigEndian, comp)
 	_ = binary.Write(buf, binary.BigEndian, cmd)
 	_ = binary.Write(buf, binary.BigEndian, err)
-	_ = binary.Write(buf, binary.BigEndian, qType)
-	_ = binary.Write(buf, binary.BigEndian, id)
-	for l := content.Front(); l != nil; l = l.Next() {
-		WriteTdf(buf, l.Value.(Tdf))
+
+	buf.WriteByte(byte(qType >> 8))
+	if l > 0xFFFF {
+		buf.WriteByte(0x10)
+	} else {
+		buf.WriteByte(0x00)
 	}
+
+	_ = binary.Write(buf, binary.BigEndian, id)
+
+	if l > 0xFFFF {
+		buf.WriteByte(byte((l & 0xFF000000) >> 24))
+		buf.WriteByte(byte((l & 0x00FF0000) >> 16))
+	}
+
+	_, _ = buf.Write(c)
+	return buf.Bytes()
+}
+
+func (b *PacketBuff) EncodePacketRaw(packet Packet) []byte {
+	buf := &PacketBuff{Buffer: &bytes.Buffer{}}
+	_ = buf.WriteByte(byte(packet.Length >> 8))
+	_ = buf.WriteByte(byte(packet.Length & 0xFF))
+	_ = buf.WriteByte(0)
+	_ = binary.Write(buf, binary.BigEndian, packet.Component)
+	_ = binary.Write(buf, binary.BigEndian, packet.Command)
+	_ = binary.Write(buf, binary.BigEndian, packet.Error)
+	_ = binary.Write(buf, binary.BigEndian, packet.QType)
+	_ = binary.Write(buf, binary.BigEndian, packet.Id)
+	if (packet.QType & 0x10) != 0 {
+		buf.WriteByte(byte(packet.ExtLength >> 8))
+		buf.WriteByte(byte(packet.ExtLength & 0xFF))
+	}
+	_, _ = buf.Write(packet.Content)
 	return buf.Bytes()
 }
