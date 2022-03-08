@@ -217,12 +217,12 @@ const (
 type ListTdf struct {
 	SubType SubType
 	Count   int32
-	List    list.List
+	List    *list.List
 
 	TdfImpl
 }
 
-func NewList(label string, subtype SubType, count int32, list list.List) ListTdf {
+func NewList(label string, subtype SubType, count int32, list *list.List) ListTdf {
 	return ListTdf{
 		SubType: subtype,
 		Count:   count,
@@ -231,11 +231,11 @@ func NewList(label string, subtype SubType, count int32, list list.List) ListTdf
 	}
 }
 
-func (l ListTdf) Write(buf *PacketBuff) {
-	_ = buf.WriteByte(l.SubType)
-	buf.WriteVarInt(int64(l.Count))
-	for el := l.List.Front(); el != nil; el = el.Next() {
-		switch l.SubType {
+func (t ListTdf) Write(buf *PacketBuff) {
+	_ = buf.WriteByte(t.SubType)
+	buf.WriteVarInt(int64(t.Count))
+	for el := t.List.Front(); el != nil; el = el.Next() {
+		switch t.SubType {
 		case IntList:
 			buf.WriteVarInt(el.Value.(int64))
 		case StringList:
@@ -384,13 +384,20 @@ func NewPair(label string, value Pair) PairTdf {
 	}
 }
 
-func (p PairTdf) Write(buf *PacketBuff) {
-	buf.WriteVarInt(p.A)
-	buf.WriteVarInt(p.B)
+func (t PairTdf) Write(buf *PacketBuff) {
+	buf.WriteVarInt(t.A)
+	buf.WriteVarInt(t.B)
 }
 
 func (t PairTdf) GetHead() TdfImpl {
 	return t.TdfImpl
+}
+
+func ReadPair(buf *PacketBuff) Pair {
+	return Pair{
+		A: int64(buf.ReadVarInt()),
+		B: int64(buf.ReadVarInt()),
+	}
 }
 
 type TripleTdf struct {
@@ -409,6 +416,14 @@ func (t TripleTdf) Write(buf *PacketBuff) {
 	buf.WriteVarInt(t.A)
 	buf.WriteVarInt(t.B)
 	buf.WriteVarInt(t.C)
+}
+
+func ReadTriple(buf *PacketBuff) Triple {
+	return Triple{
+		A: int64(buf.ReadVarInt()),
+		B: int64(buf.ReadVarInt()),
+		C: int64(buf.ReadVarInt()),
+	}
 }
 
 func (t TripleTdf) GetHead() TdfImpl {
@@ -461,6 +476,7 @@ func ReadTdf(buf *PacketBuff) Tdf {
 	case StructType:
 		return ReadStructTdf(impl, buf)
 	case ListType:
+		return ReadListTdf(impl, buf)
 	case PairListType:
 	case UnionType:
 	case VarIntListType:
@@ -521,6 +537,38 @@ func ReadStructTdf(head TdfImpl, buf *PacketBuff) StructTdf {
 	return StructTdf{
 		Values:  values,
 		Start2:  start2,
+		TdfImpl: head,
+	}
+}
+
+func ReadListTdf(head TdfImpl, buf *PacketBuff) ListTdf {
+	subType, _ := buf.ReadByte()
+	count := buf.ReadVarInt()
+	out := list.New()
+	var i uint64 = 0
+	for i < count {
+		switch subType {
+		case IntList:
+			out.PushBack(buf.ReadVarInt())
+		case StringList:
+			out.PushBack(buf.ReadString())
+		case StructList:
+			values, start2 := ReadStructValues(buf)
+			out.PushBack(StructTdf{
+				Values: values,
+				Start2: start2,
+			})
+		case TripleList:
+			out.PushBack(ReadTriple(buf))
+		default:
+			log.Printf("Don't know how to handle list type '%d'", subType)
+		}
+		i++
+	}
+	return ListTdf{
+		List:    out,
+		SubType: subType,
+		Count:   int32(count),
 		TdfImpl: head,
 	}
 }
