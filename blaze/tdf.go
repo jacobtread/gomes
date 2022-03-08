@@ -257,13 +257,13 @@ type PairListTdf struct {
 	SubTypeB SubType
 	Count    int32
 
-	ListA list.List
-	ListB list.List
+	ListA *list.List
+	ListB *list.List
 
 	TdfImpl
 }
 
-func NewPairList(label string, subtypeA SubType, subtypeB SubType, listA list.List, listB list.List, count int32) PairListTdf {
+func NewPairList(label string, subtypeA SubType, subtypeB SubType, listA *list.List, listB *list.List, count int32) PairListTdf {
 	return PairListTdf{
 		SubTypeA: subtypeA,
 		SubTypeB: subtypeB,
@@ -478,6 +478,7 @@ func ReadTdf(buf *PacketBuff) Tdf {
 	case ListType:
 		return ReadListTdf(impl, buf)
 	case PairListType:
+		return ReadPairListTdf(impl, buf)
 	case UnionType:
 	case VarIntListType:
 	case PairType:
@@ -570,5 +571,58 @@ func ReadListTdf(head TdfImpl, buf *PacketBuff) ListTdf {
 		SubType: subType,
 		Count:   int32(count),
 		TdfImpl: head,
+	}
+}
+
+func ReadPairListTdf(head TdfImpl, buf *PacketBuff) PairListTdf {
+	subTypeA, _ := buf.ReadByte()
+	subTypeB, _ := buf.ReadByte()
+	count := buf.ReadVarInt()
+	outA := list.New()
+	outB := list.New()
+	var i uint64 = 0
+	for i < count {
+		switch subTypeA {
+		case IntList:
+			outA.PushBack(buf.ReadVarInt())
+		case StringList:
+			outA.PushBack(buf.ReadString())
+		case StructList:
+			values, start2 := ReadStructValues(buf)
+			outA.PushBack(StructTdf{
+				Values: values,
+				Start2: start2,
+			})
+		case FloatList:
+			outA.PushBack(buf.Float64())
+		default:
+			log.Printf("Don't know how to handle list type '%d'", subTypeA)
+		}
+
+		switch subTypeB {
+		case IntList:
+			outB.PushBack(buf.ReadVarInt())
+		case StringList:
+			outB.PushBack(buf.ReadString())
+		case StructList:
+			values, start2 := ReadStructValues(buf)
+			outB.PushBack(StructTdf{
+				Values: values,
+				Start2: start2,
+			})
+		case FloatList:
+			outB.PushBack(buf.Float64())
+		default:
+			log.Printf("Don't know how to handle list type '%d'", subTypeB)
+		}
+		i++
+	}
+	return PairListTdf{
+		SubTypeA: subTypeA,
+		SubTypeB: subTypeB,
+		ListA:    outA,
+		ListB:    outB,
+		Count:    int32(count),
+		TdfImpl:  head,
 	}
 }
