@@ -233,6 +233,44 @@ var CommandNames = map[uint32]string{
 	0x78020023: "resumeSession",
 }
 
+var NotificationNames = map[uint32]string{
+	// Game Manager Component
+	0x0004000A: "NotifyMatchmakingFailed",
+	0x0004000C: "NotifyMatchmakingAsyncStatus",
+	0x0004000F: "NotifyGameCreated",
+	0x00040010: "NotifyGameRemoved",
+	0x00040014: "NotifyGameSetup",
+	0x00040015: "NotifyPlayerJoining",
+	0x00040016: "NotifyJoiningPlayerInitiateConnections",
+	0x00040017: "NotifyPlayerJoiningQueue",
+	0x00040018: "NotifyPlayerPromotedFromQueue",
+	0x00040019: "NotifyPlayerClaimingReservation",
+	0x0004001E: "NotifyPlayerJoinCompleted",
+	0x00040028: "NotifyPlayerRemoved",
+	0x0004003C: "NotifyHostMigrationFinished",
+	0x00040046: "NotifyHostMigrationStart",
+	0x00040047: "NotifyPlatformHostInitialized",
+	0x00040050: "NotifyGameAttribChange",
+	0x0004005A: "NotifyPlayerAttribChange",
+	0x0004005F: "NotifyPlayerCustomDataChange",
+	0x00040064: "NotifyGameStateChange",
+	0x0004006E: "NotifyGameSettingsChange",
+	0x0004006F: "NotifyGameCapacityChange",
+	0x00040070: "NotifyGameReset",
+	0x00040071: "NotifyGameReportingIdChange",
+	0x00040073: "NotifyGameSessionUpdated",
+	0x00040074: "NotifyGamePlayerStateChange",
+	0x00040075: "NotifyGamePlayerTeamChange",
+	0x00040076: "NotifyGameTeamIdChange",
+	0x00040077: "NotifyProcessQueue",
+	0x00040078: "NotifyPresenceModeChanged",
+	0x00040079: "NotifyGamePlayerQueuePositionChange",
+	0x000400C9: "NotifyGameListUpdate",
+	0x000400CA: "NotifyAdminListChange",
+	0x000400DC: "NotifyCreateDynamicDedicatedServerGame",
+	0x000400E6: "NotifyGameNameChange",
+}
+
 type Connection struct {
 	PacketBuff
 	net.Conn
