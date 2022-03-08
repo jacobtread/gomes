@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"strings"
 )
 
 type Connection struct {
@@ -76,6 +77,28 @@ func (b *PacketBuff) ReadVarInt() uint64 {
 // WriteNum takes any number type and writes it to the packet
 func (b *PacketBuff) WriteNum(value any) {
 	_ = binary.Write(b.Writer, binary.BigEndian, value)
+}
+
+// ReadString reads a string from the buffer
+func (b *PacketBuff) ReadString() string {
+	l := b.ReadVarInt()
+	buf := make([]byte, l)
+	_, _ = io.ReadFull(b, buf)
+	_, _ = b.ReadByte() // Strings end with a zero byte
+	return string(buf)
+}
+
+// WriteString writes a string to the buffer
+func (b *PacketBuff) WriteString(value string) {
+	var l int
+	if strings.HasSuffix(value, "\\0") {
+		l = len(value)
+	} else {
+		l = len(value) + 1
+	}
+	b.WriteVarInt(int64(l))
+	_, _ = b.Write([]byte(value))
+	_ = b.WriteByte(0)
 }
 
 // ReadPacket reads a game packet from the provided packet reader
